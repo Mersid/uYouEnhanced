@@ -78,9 +78,9 @@ NSArray *copyKeys = @[
 /* MAIN     Shorts Keys */ @"hideBuySuperThanks_enabled", @"hideSubcriptions_enabled", @"disableResumeToShorts_enabled", @"shortsQualityPicker_enabled",
 /* MAIN  Player UI Keys */ @"redSubscribeButton_enabled", @"hideButtonContainers_enabled", @"hideConnectButton_enabled", @"hideShareButton_enabled", @"hideRemixButton_enabled", @"hideThanksButton_enabled", @"hideDownloadButton_enabled", @"hideClipButton_enabled", @"hideSaveToPlaylistButton_enabled", @"hideReportButton_enabled", @"hidePreviewCommentSection_enabled", @"hideCommentSection_enabled",
 /* MAIN    Overlay Keys */ @"disableAccountSection_enabled", @"disableAutoplaySection_enabled", @"disableTryNewFeaturesSection_enabled", @"disableVideoQualityPreferencesSection_enabled", @"disableNotificationsSection_enabled", @"disableManageAllHistorySection_enabled", @"disableYourDataInYouTubeSection_enabled", @"disablePrivacySection_enabled", @"disableLiveChatSection_enabled", @"hidePremiumPromos_enabled",
-/* MAIN     App UI Keys */ @"hideHomeTab_enabled", @"lowContrastMode_enabled", @"fixLowContrastMode_enabled", @"disableModernButtons_enabled", @"disableRoundedHints_enabled", @"disableModernFlags_enabled", @"ytNoModernUI_enabled", @"enableVersionSpoofer_enabled",
+/* MAIN     App UI Keys */ @"hideHomeTab_enabled", @"lowContrastMode_enabled", @"classicVideoPlayer_enabled", @"fixLowContrastMode_enabled", @"disableModernButtons_enabled", @"disableRoundedHints_enabled", @"disableModernFlags_enabled", @"ytNoModernUI_enabled", @"enableVersionSpoofer_enabled",
 /* MAIN       Misc Keys */ @"uYouAdBlockingWorkaroundLite_enabled", @"uYouAdBlockingWorkaround_enabled", @"disableAnimatedYouTubeLogo_enabled", @"centerYouTubeLogo_enabled", @"hideYouTubeLogo_enabled", @"ytStartupAnimation_enabled", @"disableHints_enabled", @"stickNavigationBar_enabled", @"hideSponsorBlockButton_enabled", @"hideChipBar_enabled", @"hidePlayNextInQueue_enabled", @"hideCommunityPosts_enabled", @"hideChannelHeaderLinks_enabled", @"iPhoneLayout_enabled", @"bigYTMiniPlayer_enabled", @"reExplore_enabled", @"autoHideHomeBar_enabled", @"hideSubscriptionsNotificationBadge_enabled", @"fixCasting_enabled", @"newSettingsUI_enabled", @"flex_enabled",
-/* TWEAK      uYou Keys */ @"hideShortsTab", @"hideCreateTab", @"hideCastButton", @"relatedVideosAtTheEndOfYTVideos", @"disableAgeRestriction", @"removeYouTubeAds", @"noSuggestedVideoAtEnd", @"showedWelcomeVC", @"shortsProgressBar", @"hideShortsCells", @"removeShortsCell", @"startupPage",
+/* TWEAK      uYou Keys */ @"showedWelcomeVC", @"hideShortsTab", @"hideCreateTab", @"hideCastButton", @"relatedVideosAtTheEndOfYTVideos", @"removeYouTubeAds", @"backgroundPlayback", @"disableAgeRestriction", @"iPadLayout", @"noSuggestedVideoAtEnd", @"shortsProgressBar", @"hideShortsCells", @"removeShortsCell", @"startupPage",
 /* TWEAK       iSB Keys */ @"kMinimumDuration", @"kShowSkipNotice", @"kShowButtonsInPlayer", @"kHideStartEndButtonInPlayer", @"kShowModifiedTime", @"kSkipAudioNotification", @"kEnableSkipCountTracking", @"kSkipNoticeDuration", // these iSponsorBlock keys don't appear when copying keys.
 /* TWEAK     YTUHD Keys */ @"EnableVP9", @"AllVP9"
 ];
@@ -201,21 +201,19 @@ extern NSBundle *uYouPlusBundle();
         selectBlock:^BOOL (YTSettingsCell *cell, NSUInteger arg1) {
             if (IS_ENABLED(@"replaceCopyandPasteButtons_enabled")) {
                 // Export Settings functionality
-                NSUserDefaults *userDefaults = [NSUserDefaults standardUserDefaults];
+                NSURL *tempFileURL = [NSURL fileURLWithPath:[NSTemporaryDirectory() stringByAppendingPathComponent:@"exported_settings.txt"]];
                 NSMutableString *settingsString = [NSMutableString string];
                 for (NSString *key in copyKeys) {
-                    if ([userDefaults objectForKey:key]) {
-                        NSString *value = [userDefaults objectForKey:key];
+                    id value = [[NSUserDefaults standardUserDefaults] objectForKey:key];
+                    if (value) {
                         [settingsString appendFormat:@"%@: %@\n", key, value];
                     }
                 }
-            if (settingsString.length > 0) {
-                UIDocumentPickerViewController *documentPicker = [[UIDocumentPickerViewController alloc] initWithDocumentTypes:@[@"public.text"] inMode:UIDocumentPickerModeExportToService];
+                [settingsString writeToURL:tempFileURL atomically:YES encoding:NSUTF8StringEncoding error:nil];
+                UIDocumentPickerViewController *documentPicker = [[UIDocumentPickerViewController alloc] initWithURL:tempFileURL inMode:UIDocumentPickerModeExportToService];
                 documentPicker.delegate = (id<UIDocumentPickerDelegate>)self;
                 documentPicker.allowsMultipleSelection = NO;
-                [UIApplication.sharedApplication.keyWindow.rootViewController presentViewController:documentPicker animated:YES completion:nil];
-            }
-            return YES;
+                [settingsViewController presentViewController:documentPicker animated:YES completion:nil];
             } else {
                 // Copy Settings functionality (default behavior)
                 NSUserDefaults *userDefaults = [NSUserDefaults standardUserDefaults];
@@ -245,7 +243,7 @@ extern NSBundle *uYouPlusBundle();
                 UIDocumentPickerViewController *documentPicker = [[UIDocumentPickerViewController alloc] initWithDocumentTypes:@[@"public.text"] inMode:UIDocumentPickerModeImport];
                 documentPicker.delegate = (id<UIDocumentPickerDelegate>)self;
                 documentPicker.allowsMultipleSelection = NO;
-                [UIApplication.sharedApplication.keyWindow.rootViewController presentViewController:documentPicker animated:YES completion:nil];
+                [settingsViewController presentViewController:documentPicker animated:YES completion:nil];
                 return YES;
             } else {
                 // Paste Settings functionality (default behavior)
@@ -262,7 +260,7 @@ extern NSBundle *uYouPlusBundle();
                                 NSString *value = components[1];
                                 [[NSUserDefaults standardUserDefaults] setObject:value forKey:key];
                             }
-                        }
+                        }                 
                         [settingsViewController reloadData];
                         SHOW_RELAUNCH_YT_SNACKBAR;
                     }
@@ -472,7 +470,7 @@ extern NSBundle *uYouPlusBundle();
         LOC(@"HIDE_FULLSCREEN_ACTION_BUTTONS_DESC"), 
         @"hideFullscreenActions_enabled",
         ({
-            if (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad) {
+            if ([[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPad) {
                 // Show alert if the option is not compatible with iPad
                 UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"iPad Compatibility Issue" message:@"This option is only compatible with iPhone devices." preferredStyle:UIAlertControllerStyleAlert];
                 UIAlertAction *okAction = [UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil];
@@ -639,6 +637,7 @@ extern NSBundle *uYouPlusBundle();
         }
     ];
     [sectionItems addObject:lowContrastModeButton];
+    SWITCH_ITEM2(LOC(@"CLASSIC_VIDEO_PLAYER"), LOC(@"CLASSIC_VIDEO_PLAYER_DESC"), @"classicVideoPlayer_enabled");
     SWITCH_ITEM2(LOC(@"FIX_LOWCONTRASTMODE"), LOC(@"FIX_LOWCONTRASTMODE_DESC"), @"fixLowContrastMode_enabled");
     SWITCH_ITEM2(LOC(@"DISABLE_MODERN_BUTTONS"), LOC(@"DISABLE_MODERN_BUTTONS_DESC"), @"disableModernButtons_enabled");
     SWITCH_ITEM2(LOC(@"DISABLE_ROUNDED_CORNERS_ON_HINTS"), LOC(@"DISABLE_ROUNDED_CORNERS_ON_HINTS_DESC"), @"disableRoundedHints_enabled");
@@ -1394,18 +1393,23 @@ extern NSBundle *uYouPlusBundle();
         [settingsViewController setSectionItems:sectionItems forCategory:uYouPlusSection title:@"uYouEnhanced" titleDescription:LOC(@"TITLE DESCRIPTION") headerHidden:YES];
 }
 
-// File Manager (Paste Settings)
+// File Manager (Import Settings .txt)
 - (void)documentPicker:(UIDocumentPickerViewController *)controller didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls {
     if (urls.count > 0) {
-        NSString *fileContents = [NSString stringWithContentsOfURL:urls.firstObject encoding:NSUTF8StringEncoding error:nil];
-        NSArray *lines = [fileContents componentsSeparatedByString:@"\n"];
-        for (NSString *line in lines) {
-            NSArray *components = [line componentsSeparatedByString:@": "];
-            if (components.count == 2) {
-                NSString *key = components[0];
-                NSString *value = components[1];
-                [[NSUserDefaults standardUserDefaults] setObject:value forKey:key];
+        NSURL *fileURL = urls.firstObject;
+        NSString *fileContents = [NSString stringWithContentsOfURL:fileURL encoding:NSUTF8StringEncoding error:nil];
+        if (fileContents.length > 0) {
+            NSArray *lines = [fileContents componentsSeparatedByString:@"\n"];
+            for (NSString *line in lines) {
+                NSArray *components = [line componentsSeparatedByString:@": "];
+                if (components.count == 2) {
+                    NSString *key = components[0];
+                    NSString *value = components[1];
+                    [[NSUserDefaults standardUserDefaults] setObject:value forKey:key];
+                }
             }
+            YTSettingsViewController *settingsViewController = [self valueForKey:@"_settingsViewControllerDelegate"];
+            [settingsViewController reloadData];
         }
     }
 }

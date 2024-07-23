@@ -2,6 +2,7 @@
 
 # pragma mark - YouTube patches
 
+/*
 // Fix Google Sign in by @PoomSmart and @level3tjg (qnblackcat/uYouPlus#684)
 %hook NSBundle
 - (NSDictionary *)infoDictionary {
@@ -11,6 +12,7 @@
     return info;
 }
 %end
+*/
 
 // Workaround for MiRO92/uYou-for-YouTube#12, qnblackcat/uYouPlus#263
 %hook YTDataUtils
@@ -108,30 +110,15 @@ static inline NSString* extractIdWithFormat(GPBUnknownFieldSet *fields, NSIntege
     NSString *id = [[NSString alloc] initWithData:[idField.lengthDelimitedList firstObject] encoding:NSUTF8StringEncoding];
     return [NSString stringWithFormat:format, id];
 }
-
-%hook ELMPBShowActionSheetCommand
-- (void)executeWithCommandContext:(id)_context handler:(id)_handler {
-    if (!self.hasOnAppear)
-        return %orig;
-    GPBExtensionDescriptor *innertubeCommandDescriptor = [%c(YTIInnertubeCommandExtensionRoot) innertubeCommand];
-    if (![self.onAppear hasExtension:innertubeCommandDescriptor])
-        return %orig;
-    YTICommand *innertubeCommand = [self.onAppear getExtension:innertubeCommandDescriptor];
-    GPBExtensionDescriptor *updateShareSheetCommandDescriptor = [%c(YTIUpdateShareSheetCommand) updateShareSheetCommand];
-    if(![innertubeCommand hasExtension:updateShareSheetCommandDescriptor])
-        return %orig;
-    YTIUpdateShareSheetCommand *updateShareSheetCommand = [innertubeCommand getExtension:updateShareSheetCommandDescriptor];
-    if (!updateShareSheetCommand.hasSerializedShareEntity)
-        return %orig;
-
-    GPBMessage *shareEntity = [%c(GPBMessage) deserializeFromString:updateShareSheetCommand.serializedShareEntity];
+static BOOL showNativeShareSheet(NSString *serializedShareEntity, UIView *sourceView) {
+    GPBMessage *shareEntity = [%c(GPBMessage) deserializeFromString:serializedShareEntity];
     GPBUnknownFieldSet *fields = shareEntity.unknownFields;
     NSString *shareUrl;
 
     if ([fields hasField:ShareEntityFieldClip]) {
         GPBUnknownField *shareEntityClip = [fields getField:ShareEntityFieldClip];
         if ([shareEntityClip.lengthDelimitedList count] != 1)
-            return %orig;
+            return NO;
         GPBMessage *clipMessage = [%c(GPBMessage) parseFromData:[shareEntityClip.lengthDelimitedList firstObject] error:nil];
         shareUrl = extractIdWithFormat(clipMessage.unknownFields, 1, @"https://youtube.com/clip/%@");
     }
@@ -152,12 +139,60 @@ static inline NSString* extractIdWithFormat(GPBUnknownFieldSet *fields, NSIntege
         shareUrl = extractIdWithFormat(fields, ShareEntityFieldVideo, @"https://youtube.com/watch?v=%@");
 
     if (!shareUrl)
-        return %orig;
+        return NO;
 
-    UIActivityViewController *activityViewController = [[UIActivityViewController alloc]initWithActivityItems:@[shareUrl] applicationActivities:nil];
-    [[%c(YTUIUtils) topViewControllerForPresenting] presentViewController:activityViewController animated:YES completion:^{}];
+    UIActivityViewController *activityViewController = [[UIActivityViewController alloc] initWithActivityItems:@[shareUrl] applicationActivities:nil];
+    activityViewController.excludedActivityTypes = @[UIActivityTypeAssignToContact, UIActivityTypePrint];
+
+    UIViewController *topViewController = [%c(YTUIUtils) topViewControllerForPresenting];
+
+    if (activityViewController.popoverPresentationController) {
+        activityViewController.popoverPresentationController.sourceView = topViewController.view;
+        activityViewController.popoverPresentationController.sourceRect = [sourceView convertRect:sourceView.bounds toView:topViewController.view];
+    }
+
+    [topViewController presentViewController:activityViewController animated:YES completion:nil];
+
+    return YES;
+}
+
+/* -------------------- iPad Layout -------------------- */
+
+%hook YTAccountScopedCommandResponderEvent
+- (void)send {
+    GPBExtensionDescriptor *shareEntityEndpointDescriptor = [%c(YTIShareEntityEndpoint) shareEntityEndpoint];
+    if (![self.command hasExtension:shareEntityEndpointDescriptor])
+        return %orig;
+    YTIShareEntityEndpoint *shareEntityEndpoint = [self.command getExtension:shareEntityEndpointDescriptor];
+    if (!shareEntityEndpoint.hasSerializedShareEntity)
+        return %orig;
+    if (!showNativeShareSheet(shareEntityEndpoint.serializedShareEntity, self.fromView))
+        return %orig;
 }
 %end
+
+/* ------------------- iPhone Layout ------------------- */
+
+%hook ELMPBShowActionSheetCommand
+- (void)executeWithCommandContext:(ELMCommandContext*)context handler:(id)_handler {
+    if (!self.hasOnAppear)
+        return %orig;
+    GPBExtensionDescriptor *innertubeCommandDescriptor = [%c(YTIInnertubeCommandExtensionRoot) innertubeCommand];
+    if (![self.onAppear hasExtension:innertubeCommandDescriptor])
+        return %orig;
+    YTICommand *innertubeCommand = [self.onAppear getExtension:innertubeCommandDescriptor];
+    GPBExtensionDescriptor *updateShareSheetCommandDescriptor = [%c(YTIUpdateShareSheetCommand) updateShareSheetCommand];
+    if(![innertubeCommand hasExtension:updateShareSheetCommandDescriptor])
+        return %orig;
+    YTIUpdateShareSheetCommand *updateShareSheetCommand = [innertubeCommand getExtension:updateShareSheetCommandDescriptor];
+    if (!updateShareSheetCommand.hasSerializedShareEntity)
+        return %orig;
+    if (!showNativeShareSheet(updateShareSheetCommand.serializedShareEntity, context.context.fromView))
+        return %orig;
+}
+%end
+
+//
 
 // iOS 16 uYou crash fix - @level3tjg: https://github.com/qnblackcat/uYouPlus/pull/224
 // %group iOS16
