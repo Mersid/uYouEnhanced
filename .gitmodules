@@ -55,10 +55,6 @@
 [submodule "Tweaks/YouTube-X"]
     path = Tweaks/YouTube-X
     url = https://github.com/PoomSmart/YouTube-X/
-[submodule "Tweaks/YouTubeHeader"]
-    path = Tweaks/YouTubeHeader
-    url = https://github.com/arichornloverALT/YouTubeHeader.git
-    branch = main
 [submodule "Tweaks/YTABConfig"]
     path = Tweaks/YTABConfig
     url = https://github.com/PoomSmart/YTABConfig.git
@@ -92,3 +88,6 @@
 [submodule "Tweaks/Return-YouTube-Dislikes"]
 	path = Tweaks/Return-YouTube-Dislikes
 	url = https://github.com/PoomSmart/Return-YouTube-Dislikes
+[submodule "Tweaks/YouTubeHeader"]
+	path = Tweaks/YouTubeHeader
+	url = https://github.com/PoomSmart/YouTubeHeader
